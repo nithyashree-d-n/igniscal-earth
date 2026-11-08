@@ -106,8 +106,8 @@ def test_spatial_common_grid_aggregation():
     """Verify observations are assigned to projected ~1km grid cells with dual sensor counts."""
     obs1 = ObservationRecord(
         observation_id="m1",
-        latitude=12.5000,
-        longitude=76.5000,
+        latitude=12.5020,
+        longitude=76.4950,
         acquisition_datetime_utc="2023-03-15T04:30:00Z",
         acquisition_date="2023-03-15",
         acquisition_time="0430",
@@ -119,8 +119,8 @@ def test_spatial_common_grid_aggregation():
     )
     obs2 = ObservationRecord(
         observation_id="v1",
-        latitude=12.5002,
-        longitude=76.5002,
+        latitude=12.5022,
+        longitude=76.4952,
         acquisition_datetime_utc="2023-03-15T05:00:00Z",
         acquisition_date="2023-03-15",
         acquisition_time="0500",

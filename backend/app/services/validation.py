@@ -164,20 +164,21 @@ class DataValidator:
 
             # 8. Determine sensor family
             sensor_fam = "UNKNOWN"
-            if "viirs" in instr.lower() or "bright_ti4" in normalized_row or "ti4" in normalized_row or "noaa" in sat.lower() or "npp" in sat.lower():
+            if "viirs" in instr.lower() or "noaa" in sat.lower() or "npp" in sat.lower():
                 sensor_fam = "VIIRS"
                 viirs_count += 1
-            elif "modis" in instr.lower() or "bright_t31" in normalized_row or "terra" in sat.lower() or "aqua" in sat.lower() or "brightness" in normalized_row:
+            elif "modis" in instr.lower() or "terra" in sat.lower() or "aqua" in sat.lower():
+                sensor_fam = "MODIS"
+                modis_count += 1
+            elif bool(normalized_row.get('bright_ti4')):
+                sensor_fam = "VIIRS"
+                viirs_count += 1
+            elif bool(normalized_row.get('brightness')) or bool(normalized_row.get('bright_t31')):
                 sensor_fam = "MODIS"
                 modis_count += 1
             else:
-                # Default heuristics based on columns
-                if "bright_ti4" in normalized_row:
-                    sensor_fam = "VIIRS"
-                    viirs_count += 1
-                else:
-                    sensor_fam = "MODIS"
-                    modis_count += 1
+                sensor_fam = "MODIS"
+                modis_count += 1
 
             # Track spatial and temporal extent
             min_lon = min(min_lon, lon)

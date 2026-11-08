@@ -1,5 +1,6 @@
 """REST API Endpoints for FireSignal."""
 import uuid
+import json
 import logging
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query, Response
@@ -270,9 +271,13 @@ def get_analysis_map(analysis_id: str, sample_limit: int = Query(default=1500, l
     anl = analysis_store[analysis_id]
     records = anl["records"]
     
+    # Handle sample_limit whether passed as Query object in direct function test or as int
+    limit = sample_limit.default if hasattr(sample_limit, "default") else sample_limit
+    limit = int(limit) if limit else 1500
+    
     # Efficient sample for browser map rendering
     sample_records = []
-    step = max(1, len(records) // sample_limit) if len(records) > sample_limit else 1
+    step = max(1, len(records) // limit) if len(records) > limit else 1
     for r in records[::step]:
         sample_records.append({
             "observation_id": r.observation_id,
@@ -340,7 +345,7 @@ def get_analysis_observations(
 @router.get("/analysis/{analysis_id}/export")
 def export_analysis_data(
     analysis_id: str,
-    format_type: str = Query("observations_csv", regex="^(observations_csv|grid_csv|grid_geojson|timeseries_csv|anomalies_csv)$")
+    format_type: str = Query("observations_csv", pattern="^(observations_csv|grid_csv|grid_geojson|timeseries_csv|anomalies_csv)$")
 ):
     """Export analytical data in CSV or GeoJSON format."""
     if analysis_id not in analysis_store:

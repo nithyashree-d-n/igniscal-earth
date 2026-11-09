@@ -10,7 +10,7 @@ import json
 import uuid
 import logging
 from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import random
 from app.core.config import settings
 from app.models.canonical import ObservationRecord, DataQualitySummary
@@ -210,7 +210,7 @@ class IngestionService:
             date_start=quality_summary.date_range_start,
             date_end=quality_summary.date_range_end,
             spatial_extent=quality_summary.spatial_extent,
-            created_at=datetime.utcnow().isoformat() + "Z",
+            created_at=datetime.now(timezone.utc).isoformat(),
             is_demo=is_demo,
             quality_summary=quality_summary
         )
@@ -265,7 +265,7 @@ class IngestionService:
             date_start=quality_summary.date_range_start,
             date_end=quality_summary.date_range_end,
             spatial_extent=quality_summary.spatial_extent,
-            created_at=datetime.utcnow().isoformat() + "Z",
+            created_at=datetime.now(timezone.utc).isoformat(),
             is_demo=False,
             quality_summary=quality_summary
         )
@@ -337,7 +337,7 @@ class IngestionService:
             date_start=quality_summary.date_range_start,
             date_end=quality_summary.date_range_end,
             spatial_extent=quality_summary.spatial_extent,
-            created_at=datetime.utcnow().isoformat() + "Z",
+            created_at=datetime.now(timezone.utc).isoformat(),
             is_demo=False,
             quality_summary=quality_summary
         )

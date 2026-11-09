@@ -1,7 +1,7 @@
 """Data validation and quality assessment service for FireSignal."""
 import logging
 from typing import List, Dict, Any, Tuple, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models.canonical import DataQualitySummary
 
 logger = logging.getLogger("firesignal.validation")
@@ -223,7 +223,7 @@ class DataValidator:
             dataset_id=dataset_id,
             source_name=source_name,
             product_name=product_name,
-            ingestion_time=datetime.utcnow().isoformat() + "Z",
+            ingestion_time=datetime.now(timezone.utc).isoformat(),
             total_raw_records=total_raw,
             valid_records=valid_count,
             invalid_records=invalid_count,

@@ -1,5 +1,5 @@
 """Canonical scientific data models for FireSignal."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
 
@@ -35,7 +35,7 @@ class ObservationRecord(BaseModel):
     # Provenance
     source_version: Optional[str] = None
     source_file: str = "unknown"
-    ingestion_timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
+    ingestion_timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     
     # Spatial Harmonization fields (populated by engine)
     grid_cell_id: Optional[str] = None

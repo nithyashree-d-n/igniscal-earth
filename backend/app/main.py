@@ -50,16 +50,25 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Register API Router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+# Mount Frontend Static Assets if built
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
 
-@app.get("/")
-def root():
-    return {
-        "app": settings.APP_NAME,
-        "tagline": "One view of fire activity. Across sensors. Across time.",
-        "version": settings.APP_VERSION,
-        "docs": "/docs",
-        "api": f"{settings.API_V1_PREFIX}/health"
-    }
+frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if frontend_dist.exists():
+    logger.info(f"Mounting production frontend build from {frontend_dist}")
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+else:
+    @app.get("/")
+    def root():
+        return {
+            "app": settings.APP_NAME,
+            "tagline": "One view of fire activity. Across sensors. Across time.",
+            "version": settings.APP_VERSION,
+            "docs": "/docs",
+            "api": f"{settings.API_V1_PREFIX}/health",
+            "note": "Frontend dist not built yet. Run 'cd frontend && npm run build' or 'npm run dev'."
+        }
 
 
 if __name__ == "__main__":

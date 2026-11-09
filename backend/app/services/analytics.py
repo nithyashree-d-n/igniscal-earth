@@ -5,7 +5,7 @@ robust MAD-based anomaly scores, and seasonal climatology.
 """
 import logging
 from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 import numpy as np
 from app.models.canonical import ObservationRecord
 from app.schemas.responses import (
@@ -145,7 +145,7 @@ class AnalyticsEngine:
             matrix[y][m] += 1
 
         if not current_year:
-            current_year = max(years_set) if years_set else datetime.utcnow().year
+            current_year = max(years_set) if years_set else datetime.now(timezone.utc).year
 
         comparisons: List[BaselineMonthComparison] = []
 

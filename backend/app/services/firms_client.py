@@ -68,7 +68,7 @@ class FirmsClient:
     """Client for interacting with the NASA FIRMS REST API."""
 
     def __init__(self, map_key: Optional[str] = None):
-        self.map_key = map_key or settings.FIRMS_MAP_KEY
+        self.map_key = map_key if map_key is not None else settings.FIRMS_MAP_KEY
         self.base_url = settings.FIRMS_BASE_URL.rstrip('/')
         
         # Configure robust retry session
@@ -85,7 +85,12 @@ class FirmsClient:
 
     def is_configured(self) -> bool:
         """Check if a valid MAP_KEY string is available."""
-        return bool(self.map_key and len(self.map_key.strip()) > 5)
+        if not self.map_key or not self.map_key.strip():
+            return False
+        cleaned = self.map_key.strip().lower()
+        if cleaned in ["your_map_key_here", "placeholder", "none"]:
+            return False
+        return len(cleaned) >= 10
 
     def get_supported_sources(self) -> Dict[str, Any]:
         """Return the dictionary of supported FIRMS products."""
@@ -112,8 +117,8 @@ class FirmsClient:
         Returns:
             Tuple of (list of parsed record dicts, raw CSV text)
         """
-        key = custom_key or self.map_key
-        if not key or not key.strip():
+        key = custom_key if custom_key is not None else self.map_key
+        if not key or not key.strip() or key.strip().lower() in ["your_map_key_here", "placeholder"]:
             raise FirmsClientError(
                 "NASA FIRMS MAP_KEY is not configured. Please supply a MAP_KEY in settings or the UI.",
                 error_type="unauthorized"

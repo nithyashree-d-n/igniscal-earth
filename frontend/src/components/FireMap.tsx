@@ -22,10 +22,14 @@ export const FireMap: React.FC<FireMapProps> = ({
   const mapInstanceRef = useRef<L.Map | null>(null);
   
   // Layer groups refs
+  const baseTileLayerRef = useRef<L.TileLayer | null>(null);
   const modisLayerRef = useRef<L.LayerGroup>(L.layerGroup());
   const viirsLayerRef = useRef<L.LayerGroup>(L.layerGroup());
   const gridLayerRef = useRef<L.LayerGroup>(L.layerGroup());
   const aoiLayerRef = useRef<L.LayerGroup>(L.layerGroup());
+
+  // Basemap style: 'satellite' (Esri World Imagery) or 'osm' (OpenStreetMap)
+  const [baseMapStyle, setBaseMapStyle] = useState<'satellite' | 'osm'>('satellite');
 
   // Layer toggle states
   const [showModis, setShowModis] = useState(true);
@@ -45,17 +49,22 @@ export const FireMap: React.FC<FireMapProps> = ({
         attributionControl: false
       });
 
-      // CartoDB Dark Matter tile layer
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      // Free reliable satellite tile layer (Esri World Imagery - requires NO API key)
+      const tileUrl = baseMapStyle === 'satellite'
+        ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+      const tileLayer = L.tileLayer(tileUrl, {
         maxZoom: 19,
-        subdomains: 'abcd',
+        attribution: baseMapStyle === 'satellite'
+          ? 'Tiles &copy; Esri &mdash; NASA FIRMS'
+          : '&copy; OpenStreetMap contributors | NASA FIRMS'
       }).addTo(map);
 
-      // Attribution
-      L.control.attribution({ position: 'bottomright' })
-        .addAttribution('&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://openstreetmap.org">OSM</a> | NASA FIRMS')
-        .addTo(map);
+      baseTileLayerRef.current = tileLayer;
 
+      // Attribution
+      L.control.attribution({ position: 'bottomright' }).addTo(map);
       L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
       // Add layers to map
@@ -74,6 +83,29 @@ export const FireMap: React.FC<FireMapProps> = ({
       }
     };
   }, []);
+
+  // Update base tile layer on style toggle
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (baseTileLayerRef.current) {
+      map.removeLayer(baseTileLayerRef.current);
+    }
+
+    const tileUrl = baseMapStyle === 'satellite'
+      ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+    const tileLayer = L.tileLayer(tileUrl, {
+      maxZoom: 19,
+      attribution: baseMapStyle === 'satellite'
+        ? 'Tiles &copy; Esri &mdash; NASA FIRMS'
+        : '&copy; OpenStreetMap contributors | NASA FIRMS'
+    }).addTo(map);
+
+    baseTileLayerRef.current = tileLayer;
+  }, [baseMapStyle]);
 
   // Sync layer toggles with Leaflet
   useEffect(() => {
@@ -267,7 +299,32 @@ export const FireMap: React.FC<FireMapProps> = ({
       <div className="absolute top-3 right-3 z-10 bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg p-2.5 shadow-lg text-xs space-y-2">
         <div className="flex items-center space-x-1.5 font-bold text-slate-200 pb-1 border-b border-slate-800">
           <Layers className="w-3.5 h-3.5 text-amber-400" />
-          <span>Layer Controls</span>
+          <span>Map Controls</span>
+        </div>
+
+        {/* Basemap Switcher (Free Esri Satellite vs Free OSM) */}
+        <div className="pb-1.5 border-b border-slate-800">
+          <span className="text-[10px] text-slate-400 block mb-1">Basemap View</span>
+          <div className="grid grid-cols-2 gap-1 bg-slate-950 p-0.5 rounded border border-slate-800">
+            <button
+              type="button"
+              onClick={() => setBaseMapStyle('satellite')}
+              className={`py-1 text-[10px] rounded font-medium transition-colors ${
+                baseMapStyle === 'satellite' ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Satellite (Esri)
+            </button>
+            <button
+              type="button"
+              onClick={() => setBaseMapStyle('osm')}
+              className={`py-1 text-[10px] rounded font-medium transition-colors ${
+                baseMapStyle === 'osm' ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Street (OSM)
+            </button>
+          </div>
         </div>
 
         <div className="space-y-1.5">

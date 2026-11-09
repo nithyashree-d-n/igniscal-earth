@@ -1,10 +1,11 @@
 import React from 'react';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, Legend, ReferenceLine
+  CartesianGrid, Legend
 } from 'recharts';
 import { BarChart3, AlertTriangle, CheckCircle2, TrendingUp, Calendar, Zap, Info } from 'lucide-react';
 import { BaselineMonthComparison, SeasonalityAnalysis, SummaryMetrics } from '../types';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 interface AnalyticsTabProps {
   anomalies: BaselineMonthComparison[];
@@ -13,7 +14,7 @@ interface AnalyticsTabProps {
 }
 
 export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
-  anomalies,
+  anomalies = [],
   seasonality,
   metrics
 }) => {
@@ -32,7 +33,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       </div>
 
       {/* 1. Historical Baseline vs Current Year Chart */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4 min-w-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
           <div>
             <h3 className="text-sm font-semibold text-slate-200">
@@ -54,27 +55,29 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
           </div>
         </div>
 
-        <div className="h-72 w-full">
-          {anomalies.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={anomalies} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="month_name" stroke="#64748b" fontSize={11} tickFormatter={(v) => v.slice(0, 3)} />
-                <YAxis stroke="#64748b" fontSize={11} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }}
-                  itemStyle={{ color: '#f8fafc' }}
-                />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                <Bar dataKey="current_count" name="Current Hotspots" fill="#f97316" radius={[4, 4, 0, 0]} />
-                <Line type="monotone" dataKey="historical_median" name="Historical Median" stroke="#38bdf8" strokeWidth={2.5} dot={{ r: 3 }} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-full text-slate-500 text-xs">
-              No historical anomaly data available.
-            </div>
-          )}
+        <div className="h-72 w-full min-w-0">
+          <ErrorBoundary fallbackTitle="Baseline Chart Interrupted">
+            {anomalies && anomalies.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={anomalies} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="month_name" stroke="#64748b" fontSize={11} tickFormatter={(v) => (v || '').slice(0, 3)} />
+                  <YAxis stroke="#64748b" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }}
+                    itemStyle={{ color: '#f8fafc' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                  <Bar dataKey="current_count" name="Current Hotspots" fill="#f97316" radius={[4, 4, 0, 0]} />
+                  <Line type="monotone" dataKey="historical_median" name="Historical Median" stroke="#38bdf8" strokeWidth={2.5} dot={{ r: 3 }} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-500 text-xs">
+                No historical anomaly data available.
+              </div>
+            )}
+          </ErrorBoundary>
         </div>
       </div>
 
@@ -98,51 +101,64 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                 <th className="px-3 py-2.5">Month</th>
                 <th className="px-3 py-2.5 text-right">Current Count</th>
                 <th className="px-3 py-2.5 text-right">Historical Median</th>
-                <th className="px-3 py-2.5 text-right">Mean ± Std</th>
-                <th className="px-3 py-2.5 text-right">IQR (Q75-Q25)</th>
-                <th className="px-3 py-2.5 text-right">MAD Score</th>
-                <th className="px-3 py-2.5 text-center">Classification</th>
-                <th className="px-3 py-2.5">Analytical Explanation</th>
+                <th className="px-3 py-2.5 text-right">MAD Dispersion</th>
+                <th className="px-3 py-2.5 text-right">Years Analyzed</th>
+                <th className="px-3 py-2.5 text-right">Anomaly Score (MAD)</th>
+                <th className="px-3 py-2.5">Status</th>
+                <th className="px-3 py-2.5">Scientific Explanation</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-mono text-slate-300">
-              {anomalies.map((item) => {
-                let badgeClass = 'bg-slate-800 text-slate-400';
-                if (item.status === 'Significantly Above Baseline') {
-                  badgeClass = 'bg-red-500/20 text-red-300 border border-red-500/30';
-                } else if (item.status === 'Above Baseline') {
-                  badgeClass = 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
-                } else if (item.status === 'Within Range') {
-                  badgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
-                }
-
-                return (
-                  <tr key={item.month} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="px-3 py-2 font-sans font-semibold text-slate-200">{item.month_name}</td>
-                    <td className="px-3 py-2 text-right font-bold text-orange-400">{item.current_count}</td>
-                    <td className="px-3 py-2 text-right text-sky-400">{item.historical_median}</td>
-                    <td className="px-3 py-2 text-right text-slate-400">{item.historical_mean} ± {item.historical_std}</td>
-                    <td className="px-3 py-2 text-right text-slate-400">{item.historical_iqr}</td>
-                    <td className="px-3 py-2 text-right font-bold">
-                      {item.historical_years_count >= 2 ? (
-                        <span className={item.anomaly_score > 2 ? 'text-red-400' : 'text-slate-300'}>
-                          {item.anomaly_score.toFixed(1)}
-                        </span>
-                      ) : (
-                        <span className="text-slate-600">—</span>
-                      )}
+              {anomalies && anomalies.length > 0 ? (
+                anomalies.map((row) => (
+                  <tr key={row.month} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="px-3 py-2.5 font-sans font-bold text-slate-100">{row.month_name}</td>
+                    <td className="px-3 py-2.5 text-right font-bold text-amber-400">
+                      {(row.current_count ?? 0).toLocaleString()}
                     </td>
-                    <td className="px-3 py-2 text-center font-sans">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${badgeClass}`}>
-                        {item.status}
+                    <td className="px-3 py-2.5 text-right text-slate-300">
+                      {(row.historical_median ?? 0).toLocaleString()}
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-slate-400">
+                      {row.historical_mad != null ? `±${row.historical_mad}` : 'N/A'}
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-slate-400">
+                      {row.historical_years_count ?? 0} yrs
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-bold">
+                      {row.anomaly_score != null ? (
+                        <span className={
+                          row.anomaly_score > 3.0 ? 'text-red-400 font-bold' :
+                          row.anomaly_score > 1.5 ? 'text-orange-400' :
+                          row.anomaly_score < -1.5 ? 'text-sky-400' : 'text-slate-300'
+                        }>
+                          {row.anomaly_score > 0 ? `+${row.anomaly_score.toFixed(2)}` : row.anomaly_score.toFixed(2)}
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="px-3 py-2.5 font-sans">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
+                        row.status === 'Significantly Above Baseline' ? 'bg-red-500/10 text-red-400 border-red-500/30' :
+                        row.status === 'Above Baseline' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
+                        row.status === 'Below Baseline' ? 'bg-sky-500/10 text-sky-400 border-sky-500/30' :
+                        row.status === 'Insufficient Baseline' ? 'bg-slate-800 text-slate-400 border-slate-700' :
+                        'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                      }`}>
+                        {row.status}
                       </span>
                     </td>
-                    <td className="px-3 py-2 font-sans text-slate-400 text-[11px] max-w-xs truncate" title={item.explanation}>
-                      {item.explanation}
+                    <td className="px-3 py-2.5 font-sans text-xs text-slate-400 max-w-xs truncate" title={row.explanation}>
+                      {row.explanation}
                     </td>
                   </tr>
-                );
-              })}
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} className="px-3 py-6 text-center text-slate-500">
+                    No historical anomaly calculations available for this dataset.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -151,87 +167,74 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {/* 3. Seasonality Climatology & Interannual Matrix */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Monthly Climatology Bar Chart */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-3">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-3 min-w-0">
           <div className="border-b border-slate-800 pb-2">
             <h3 className="text-sm font-semibold text-slate-200">Annual Fire Climatology Profile</h3>
             <p className="text-xs text-slate-400">Percentage distribution of fire activity throughout the year</p>
           </div>
 
-          <div className="h-60 w-full">
-            {seasonality && seasonality.monthly_climatology.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={seasonality.monthly_climatology} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="month_name" stroke="#64748b" fontSize={10} tickFormatter={(v) => v.slice(0, 3)} />
-                  <YAxis stroke="#64748b" fontSize={10} unit="%" />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }}
-                    itemStyle={{ color: '#f8fafc' }}
-                    formatter={(val: any) => [`${val}%`, 'Climatological Share']}
-                  />
-                  <Bar dataKey="percentage" fill="#eab308" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full text-slate-500 text-xs">
-                No climatology data available.
-              </div>
-            )}
+          <div className="h-60 w-full min-w-0">
+            <ErrorBoundary fallbackTitle="Climatology Chart Interrupted">
+              {seasonality && seasonality.monthly_climatology && seasonality.monthly_climatology.length > 0 ? (
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={seasonality.monthly_climatology} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <XAxis dataKey="month_name" stroke="#64748b" fontSize={10} tickFormatter={(v) => (v || '').slice(0, 3)} />
+                    <YAxis stroke="#64748b" fontSize={10} unit="%" />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }}
+                      itemStyle={{ color: '#f8fafc' }}
+                      formatter={(val: any) => [`${val}%`, 'Climatological Share']}
+                    />
+                    <Bar dataKey="percentage" fill="#eab308" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-slate-500 text-xs">
+                  No climatology data available.
+                </div>
+              )}
+            </ErrorBoundary>
           </div>
 
           {seasonality && (
             <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800 text-slate-300">
-              <span><strong>Peak Fire Season:</strong> {seasonality.peak_months.join(', ') || 'N/A'}</span>
-              <span><strong>Lowest Season:</strong> {seasonality.lowest_months.join(', ') || 'N/A'}</span>
+              <span><strong>Peak Fire Season:</strong> {(seasonality.peak_months || []).join(', ') || 'N/A'}</span>
+              <span><strong>Lowest Season:</strong> {(seasonality.lowest_months || []).join(', ') || 'N/A'}</span>
             </div>
           )}
         </div>
 
-        {/* Interannual Matrix Table */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-3">
-          <div className="border-b border-slate-800 pb-2">
-            <h3 className="text-sm font-semibold text-slate-200">Multi-Year Interannual Matrix</h3>
-            <p className="text-xs text-slate-400">Total detected hotspots by calendar year and month</p>
-          </div>
+        {/* Statistical Guardrail Explainer Card */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="border-b border-slate-800 pb-2 mb-3">
+              <h3 className="text-sm font-semibold text-slate-200 flex items-center space-x-2">
+                <Info className="w-4 h-4 text-sky-400" />
+                <span>Methodology & Statistical Rigor</span>
+              </h3>
+              <p className="text-xs text-slate-400">Why FireSignal uses non-parametric MAD over simple means</p>
+            </div>
 
-          <div className="overflow-x-auto max-h-60">
-            {seasonality && Object.keys(seasonality.interannual_comparison).length > 0 ? (
-              <table className="w-full text-center text-xs font-mono">
-                <thead className="bg-slate-950 text-slate-400 text-[10px] uppercase border-b border-slate-800">
-                  <tr>
-                    <th className="px-2 py-1.5 text-left">Year</th>
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(m => (
-                      <th key={m} className="px-1.5 py-1.5">{m}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                  {Object.entries(seasonality.interannual_comparison).map(([year, months]) => (
-                    <tr key={year} className="hover:bg-slate-800/40">
-                      <td className="px-2 py-1.5 font-bold text-left text-slate-100">{year}</td>
-                      {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map(mo => {
-                        const cnt = months[mo] || 0;
-                        let heatBg = '';
-                        if (cnt > 30) heatBg = 'bg-red-500/30 text-red-300 font-bold';
-                        else if (cnt > 15) heatBg = 'bg-amber-500/20 text-amber-300';
-                        else if (cnt > 0) heatBg = 'text-slate-300';
-                        else heatBg = 'text-slate-700';
-
-                        return (
-                          <td key={mo} className={`px-1 py-1.5 ${heatBg}`}>
-                            {cnt}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="flex items-center justify-center h-40 text-slate-500 text-xs">
-                No multi-year records in selected dataset.
+            <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                <span className="font-semibold text-amber-400 block mb-1">1. Highly Skewed Distributions</span>
+                Wildfire and crop burning activity is strongly episodic and zero-inflated. A standard mean and standard deviation creates false baselines inflated by extreme blowout seasons.
               </div>
-            )}
+
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                <span className="font-semibold text-sky-400 block mb-1">2. Median Absolute Deviation (MAD)</span>
+                We use the median as the central climatological expectation, scaled by MAD:
+                <code className="block mt-1 font-mono text-[11px] text-sky-300 bg-slate-900 p-1 rounded">
+                  Score = (Current - Median) / (1.4826 * MAD)
+                </code>
+              </div>
+
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                <span className="font-semibold text-emerald-400 block mb-1">3. Multi-Year Climatology Requirement</span>
+                An anomaly classification is only marked valid if at least 2 distinct historical years are available for that calendar month. Otherwise, it is transparently flagged as &ldquo;Insufficient Baseline&rdquo;.
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { MethodologyTab } from './pages/MethodologyTab';
 import { DataQualityTab } from './pages/DataQualityTab';
 import { ExportTab } from './pages/ExportTab';
 import { LiveFetchModal } from './components/LiveFetchModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 import {
   fetchHealth,
@@ -191,68 +192,70 @@ export const App: React.FC = () => {
 
       {/* Main View Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {activeTab === 'overview' && (
-          <OverviewTab
-            metrics={metrics}
-            timeseries={timeseries}
-            gridCells={gridCells}
-            observations={observations}
-            currentDataset={currentDataset}
-            aoiBbox={activeBbox}
-            loading={loading}
-            onNavigateExplore={() => setActiveTab('explore')}
-            onRefresh={() => executeHarmonization()}
-          />
-        )}
+        <ErrorBoundary fallbackTitle="Application View Interrupted">
+          {activeTab === 'overview' && (
+            <OverviewTab
+              metrics={metrics}
+              timeseries={timeseries}
+              gridCells={gridCells}
+              observations={observations}
+              currentDataset={currentDataset}
+              aoiBbox={activeBbox}
+              loading={loading}
+              onNavigateExplore={() => setActiveTab('explore')}
+              onRefresh={() => executeHarmonization()}
+            />
+          )}
 
-        {activeTab === 'explore' && (
-          <ExploreTab
-            datasets={datasets}
-            selectedDatasetId={selectedDatasetId}
-            onSelectDataset={handleSelectDataset}
-            regions={health?.predefined_regions || []}
-            selectedRegionId={selectedRegionId}
-            onSelectRegion={(id) => { setSelectedRegionId(id); }}
-            customBbox={customBbox}
-            onSetCustomBbox={setCustomBbox}
-            startDate={startDate}
-            setStartDate={setStartDate}
-            endDate={endDate}
-            setEndDate={setEndDate}
-            selectedSensors={selectedSensors}
-            onToggleSensor={handleToggleSensor}
-            harmonizationConfig={harmonizationConfig}
-            onUpdateHarmonizationConfig={handleUpdateConfig}
-            onRunHarmonization={() => { executeHarmonization(); setActiveTab('overview'); }}
-            onUploadCSV={handleUploadCSV}
-            loading={loading}
-            onOpenLiveFetch={() => setIsLiveFetchOpen(true)}
-          />
-        )}
+          {activeTab === 'explore' && (
+            <ExploreTab
+              datasets={datasets}
+              selectedDatasetId={selectedDatasetId}
+              onSelectDataset={handleSelectDataset}
+              regions={health?.predefined_regions || []}
+              selectedRegionId={selectedRegionId}
+              onSelectRegion={(id) => { setSelectedRegionId(id); }}
+              customBbox={customBbox}
+              onSetCustomBbox={setCustomBbox}
+              startDate={startDate}
+              setStartDate={setStartDate}
+              endDate={endDate}
+              setEndDate={setEndDate}
+              selectedSensors={selectedSensors}
+              onToggleSensor={handleToggleSensor}
+              harmonizationConfig={harmonizationConfig}
+              onUpdateHarmonizationConfig={handleUpdateConfig}
+              onRunHarmonization={() => { executeHarmonization(); setActiveTab('overview'); }}
+              onUploadCSV={handleUploadCSV}
+              loading={loading}
+              onOpenLiveFetch={() => setIsLiveFetchOpen(true)}
+            />
+          )}
 
-        {activeTab === 'analytics' && (
-          <AnalyticsTab
-            anomalies={anomalies}
-            seasonality={seasonality}
-            metrics={metrics}
-          />
-        )}
+          {activeTab === 'analytics' && (
+            <AnalyticsTab
+              anomalies={anomalies}
+              seasonality={seasonality}
+              metrics={metrics}
+            />
+          )}
 
-        {activeTab === 'methodology' && (
-          <MethodologyTab />
-        )}
+          {activeTab === 'methodology' && (
+            <MethodologyTab />
+          )}
 
-        {activeTab === 'quality' && (
-          <DataQualityTab currentDataset={currentDataset} />
-        )}
+          {activeTab === 'quality' && (
+            <DataQualityTab currentDataset={currentDataset} />
+          )}
 
-        {activeTab === 'export' && (
-          <ExportTab
-            analysisId={analysisId}
-            metrics={metrics}
-            currentDataset={currentDataset}
-          />
-        )}
+          {activeTab === 'export' && (
+            <ExportTab
+              analysisId={analysisId}
+              metrics={metrics}
+              currentDataset={currentDataset}
+            />
+          )}
+        </ErrorBoundary>
       </main>
 
       {/* Footer */}

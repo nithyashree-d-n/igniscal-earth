@@ -21,13 +21,14 @@ export const KPICards: React.FC<KPICardsProps> = ({ metrics }) => {
   let anomalyBg = 'bg-slate-800/80 text-slate-300 border-slate-700';
   let AnomalyIcon = Activity;
 
-  if (metrics.anomaly_status === 'Significantly Above Baseline') {
+  const status = metrics.anomaly_status || 'Within Range';
+  if (status === 'Significantly Above Baseline') {
     anomalyBg = 'bg-red-500/10 text-red-400 border-red-500/30';
     AnomalyIcon = AlertTriangle;
-  } else if (metrics.anomaly_status === 'Above Baseline') {
+  } else if (status === 'Above Baseline') {
     anomalyBg = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
     AnomalyIcon = AlertTriangle;
-  } else if (metrics.anomaly_status === 'Within Range') {
+  } else if (status === 'Within Range') {
     anomalyBg = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
     AnomalyIcon = CheckCircle2;
   }
@@ -42,10 +43,10 @@ export const KPICards: React.FC<KPICardsProps> = ({ metrics }) => {
         </div>
         <div className="mt-2">
           <div className="text-2xl font-bold text-white tracking-tight">
-            {metrics.total_combined_detections.toLocaleString()}
+            {(metrics.total_combined_detections ?? 0).toLocaleString()}
           </div>
           <div className="text-[10px] text-slate-400 mt-0.5 truncate">
-            {metrics.daily_average_detections} avg / active day
+            {metrics.daily_average_detections ?? 0} avg / active day
           </div>
         </div>
       </div>
@@ -61,12 +62,12 @@ export const KPICards: React.FC<KPICardsProps> = ({ metrics }) => {
         </div>
         <div className="mt-2">
           <div className="flex items-baseline space-x-2">
-            <span className="text-sm font-bold text-amber-400">{metrics.modis_share_percent}%</span>
+            <span className="text-sm font-bold text-amber-400">{metrics.modis_share_percent ?? 0}%</span>
             <span className="text-xs text-slate-500">vs</span>
-            <span className="text-sm font-bold text-red-400">{metrics.viirs_share_percent}%</span>
+            <span className="text-sm font-bold text-red-400">{metrics.viirs_share_percent ?? 0}%</span>
           </div>
           <div className="text-[10px] text-slate-400 mt-0.5">
-            MODIS: {metrics.total_modis_detections} • VIIRS: {metrics.total_viirs_detections}
+            MODIS: {metrics.total_modis_detections ?? 0} • VIIRS: {metrics.total_viirs_detections ?? 0}
           </div>
         </div>
       </div>
@@ -79,7 +80,7 @@ export const KPICards: React.FC<KPICardsProps> = ({ metrics }) => {
         </div>
         <div className="mt-2">
           <div className="text-2xl font-bold text-purple-300 tracking-tight">
-            {metrics.active_grid_cells_count.toLocaleString()}
+            {(metrics.active_grid_cells_count ?? 0).toLocaleString()}
           </div>
           <div className="text-[10px] text-slate-400 mt-0.5">
             ~1 km common grid cells
@@ -95,10 +96,10 @@ export const KPICards: React.FC<KPICardsProps> = ({ metrics }) => {
         </div>
         <div className="mt-2">
           <div className="text-2xl font-bold text-white tracking-tight">
-            {metrics.active_days_count} <span className="text-sm font-normal text-slate-400">days</span>
+            {metrics.active_days_count ?? 0} <span className="text-sm font-normal text-slate-400">days</span>
           </div>
           <div className="text-[10px] text-slate-400 mt-0.5 truncate">
-            Peak: {metrics.peak_activity_date || 'N/A'} ({metrics.peak_activity_count})
+            Peak: {metrics.peak_activity_date || 'N/A'} ({metrics.peak_activity_count ?? 0})
           </div>
         </div>
       </div>
@@ -111,10 +112,10 @@ export const KPICards: React.FC<KPICardsProps> = ({ metrics }) => {
         </div>
         <div className="mt-2">
           <div className="text-2xl font-bold text-yellow-400 tracking-tight">
-            {metrics.mean_frp_mw ? `${metrics.mean_frp_mw}` : 'N/A'} <span className="text-xs font-normal text-slate-400">MW mean</span>
+            {metrics.mean_frp_mw != null ? `${metrics.mean_frp_mw}` : 'N/A'} <span className="text-xs font-normal text-slate-400">MW mean</span>
           </div>
           <div className="text-[10px] text-slate-400 mt-0.5 truncate">
-            Max: {metrics.max_frp_mw ? `${metrics.max_frp_mw} MW` : 'N/A'} • {metrics.colocated_percentage}% co-located
+            Max: {metrics.max_frp_mw != null ? `${metrics.max_frp_mw} MW` : 'N/A'} • {metrics.colocated_percentage ?? 0}% co-located
           </div>
         </div>
       </div>
@@ -126,11 +127,13 @@ export const KPICards: React.FC<KPICardsProps> = ({ metrics }) => {
           <AnomalyIcon className="w-4 h-4" />
         </div>
         <div className="mt-2">
-          <div className="text-sm font-bold truncate" title={metrics.anomaly_status}>
-            {metrics.anomaly_status}
+          <div className="text-sm font-bold truncate" title={status}>
+            {status}
           </div>
-          <div className="text-[10px] opacity-80 mt-0.5 line-clamp-1" title={metrics.anomaly_explanation}>
-            {metrics.anomaly_score !== 0 ? `MAD Score: ${metrics.anomaly_score.toFixed(1)}` : metrics.anomaly_explanation}
+          <div className="text-[10px] opacity-80 mt-0.5 line-clamp-1" title={metrics.anomaly_explanation || ''}>
+            {typeof metrics.anomaly_score === 'number' && metrics.anomaly_score !== 0
+              ? `MAD Score: ${metrics.anomaly_score.toFixed(1)}`
+              : (metrics.anomaly_explanation || 'Baseline verified')}
           </div>
         </div>
       </div>

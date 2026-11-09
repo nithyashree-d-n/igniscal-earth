@@ -6,6 +6,7 @@ import { Flame, Compass, AlertCircle, Eye, RefreshCw, Layers } from 'lucide-reac
 import { SummaryMetrics, TimeSeriesPoint, GridCellFeature, ObservationPoint, DatasetInfo } from '../types';
 import { KPICards } from '../components/KPICards';
 import { FireMap } from '../components/FireMap';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 interface OverviewTabProps {
   metrics: SummaryMetrics | null;
@@ -34,15 +35,19 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const [tablePage, setTablePage] = useState(1);
   const pageSize = 8;
 
-  // Filter observations for preview table
-  const filteredObs = observations.filter(o =>
-    o.sensor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    o.satellite.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    o.date.includes(searchTerm)
-  );
+  // Filter observations for preview table safely
+  const filteredObs = (observations || []).filter(o => {
+    if (!o) return false;
+    const sTerm = (searchTerm || '').toLowerCase();
+    const sensorStr = (o.sensor || '').toLowerCase();
+    const satStr = (o.satellite || '').toLowerCase();
+    const dateStr = (o.date || '').toLowerCase();
+    return sensorStr.includes(sTerm) || satStr.includes(sTerm) || dateStr.includes(sTerm);
+  });
 
-  const paginatedObs = filteredObs.slice((tablePage - 1) * pageSize, tablePage * pageSize);
-  const totalPages = Math.ceil(filteredObs.length / pageSize);
+  const totalPages = Math.max(1, Math.ceil(filteredObs.length / pageSize));
+  const currentPage = Math.min(tablePage, totalPages);
+  const paginatedObs = filteredObs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="space-y-6">
@@ -82,7 +87,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       </div>
 
       {/* High-Level KPI Summary Cards */}
-      <KPICards metrics={metrics} />
+      <ErrorBoundary fallbackTitle="Summary KPIs Interrupted">
+        <KPICards metrics={metrics} />
+      </ErrorBoundary>
 
       {/* Main Map & Interactive Spatiotemporal View */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -93,60 +100,64 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               <span>Spatial Fire Distribution & Common Grid</span>
             </h3>
             <span className="text-xs text-slate-400">
-              Showing {observations.length.toLocaleString()} sampled detections across {gridCells.length.toLocaleString()} active cells
+              Showing {(observations || []).length.toLocaleString()} sampled detections across {(gridCells || []).length.toLocaleString()} active cells
             </span>
           </div>
-          <FireMap
-            gridCells={gridCells}
-            observations={observations}
-            aoiBbox={aoiBbox}
-          />
+          <ErrorBoundary fallbackTitle="Map Rendering Interrupted">
+            <FireMap
+              gridCells={gridCells || []}
+              observations={observations || []}
+              aoiBbox={aoiBbox}
+            />
+          </ErrorBoundary>
         </div>
 
         {/* Temporal Activity Chart */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between shadow-xl">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between shadow-xl min-w-0">
           <div>
             <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
               <h3 className="text-sm font-semibold text-slate-200">Temporal Activity Trend</h3>
               <span className="text-xs font-mono text-amber-400">
-                {timeseries.length} periods
+                {(timeseries || []).length} periods
               </span>
             </div>
             <p className="text-xs text-slate-400 mb-3">
               Detections over time separated by sensor family. Notice the higher sensitivity of VIIRS 375m.
             </p>
 
-            <div className="h-64 w-full">
-              {timeseries.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={timeseries} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorViirs" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="colorModis" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#fbbf24" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="period" stroke="#64748b" fontSize={10} tickFormatter={(val) => val.slice(-5)} />
-                    <YAxis stroke="#64748b" fontSize={10} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }}
-                      itemStyle={{ color: '#f8fafc' }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                    <Area type="monotone" dataKey="viirs_count" name="VIIRS (375m)" stroke="#f97316" fillOpacity={1} fill="url(#colorViirs)" />
-                    <Area type="monotone" dataKey="modis_count" name="MODIS (1km)" stroke="#fbbf24" fillOpacity={1} fill="url(#colorModis)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-slate-500 text-xs">
-                  No timeseries data available.
-                </div>
-              )}
+            <div className="h-64 w-full min-w-0">
+              <ErrorBoundary fallbackTitle="Trend Chart Interrupted">
+                {timeseries && timeseries.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={256}>
+                    <AreaChart data={timeseries} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorViirs" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorModis" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#fbbf24" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                      <XAxis dataKey="period" stroke="#64748b" fontSize={10} tickFormatter={(val) => (val || '').slice(-5)} />
+                      <YAxis stroke="#64748b" fontSize={10} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }}
+                        itemStyle={{ color: '#f8fafc' }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                      <Area type="monotone" dataKey="viirs_count" name="VIIRS (375m)" stroke="#f97316" fillOpacity={1} fill="url(#colorViirs)" />
+                      <Area type="monotone" dataKey="modis_count" name="MODIS (1km)" stroke="#fbbf24" fillOpacity={1} fill="url(#colorModis)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-500 text-xs">
+                    No timeseries data available.
+                  </div>
+                )}
+              </ErrorBoundary>
             </div>
           </div>
 
@@ -155,15 +166,17 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             <div className="mt-4 pt-3 border-t border-slate-800 space-y-2">
               <div className="flex justify-between text-xs text-slate-300">
                 <span>Sensor Balance</span>
-                <span className="font-mono text-amber-400">{metrics.modis_share_percent}% M / {metrics.viirs_share_percent}% V</span>
+                <span className="font-mono text-amber-400">
+                  {metrics.modis_share_percent ?? 0}% M / {metrics.viirs_share_percent ?? 0}% V
+                </span>
               </div>
               <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden flex">
-                <div style={{ width: `${metrics.modis_share_percent}%` }} className="bg-amber-400" title="MODIS" />
-                <div style={{ width: `${metrics.viirs_share_percent}%` }} className="bg-orange-500" title="VIIRS" />
+                <div style={{ width: `${metrics.modis_share_percent ?? 0}%` }} className="bg-amber-400" title="MODIS" />
+                <div style={{ width: `${metrics.viirs_share_percent ?? 0}%` }} className="bg-orange-500" title="VIIRS" />
               </div>
               <div className="flex justify-between text-[10px] text-slate-500">
-                <span>MODIS: {metrics.total_modis_detections}</span>
-                <span>VIIRS: {metrics.total_viirs_detections}</span>
+                <span>MODIS: {metrics.total_modis_detections ?? 0}</span>
+                <span>VIIRS: {metrics.total_viirs_detections ?? 0}</span>
               </div>
             </div>
           )}
@@ -206,23 +219,31 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               {paginatedObs.length > 0 ? (
                 paginatedObs.map((obs) => (
                   <tr key={obs.observation_id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="px-3 py-2 text-slate-500">{obs.observation_id.slice(0, 8)}...</td>
+                    <td className="px-3 py-2 text-slate-500">{(obs.observation_id || '').slice(0, 8)}...</td>
                     <td className="px-3 py-2 font-sans font-medium text-slate-200">
                       <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${obs.sensor === 'MODIS' ? 'bg-amber-400' : 'bg-orange-500'}`} />
-                      {obs.sensor} ({obs.satellite})
+                      {obs.sensor || 'Sensor'} ({obs.satellite || 'Sat'})
                     </td>
-                    <td className="px-3 py-2">{obs.date} {obs.time}Z</td>
-                    <td className="px-3 py-2">{obs.lat.toFixed(3)}, {obs.lon.toFixed(3)}</td>
+                    <td className="px-3 py-2">{obs.date || ''} {obs.time || ''}Z</td>
+                    <td className="px-3 py-2">
+                      {typeof obs.lat === 'number' && typeof obs.lon === 'number'
+                        ? `${obs.lat.toFixed(3)}, ${obs.lon.toFixed(3)}`
+                        : '—'}
+                    </td>
                     <td className="px-3 py-2">
                       <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-sans ${
                         obs.confidence === 'high' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                         obs.confidence === 'low' ? 'bg-slate-800 text-slate-400' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                       }`}>
-                        {obs.confidence}
+                        {obs.confidence || 'nominal'}
                       </span>
                     </td>
-                    <td className="px-3 py-2 font-bold text-amber-400">{obs.frp ? `${obs.frp} MW` : '—'}</td>
-                    <td className="px-3 py-2">{obs.brightness ? `${obs.brightness} K` : '—'}</td>
+                    <td className="px-3 py-2 font-bold text-amber-400">
+                      {obs.frp != null ? `${obs.frp} MW` : '—'}
+                    </td>
+                    <td className="px-3 py-2">
+                      {obs.brightness != null ? `${obs.brightness} K` : '—'}
+                    </td>
                     <td className="px-3 py-2">
                       {obs.is_colocated ? (
                         <span className="text-sky-400 font-sans text-[11px] font-semibold">Yes</span>
@@ -246,18 +267,18 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         {/* Table Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs text-slate-400">
-            <span>Showing {(tablePage - 1) * pageSize + 1} to {Math.min(tablePage * pageSize, filteredObs.length)} of {filteredObs.length}</span>
+            <span>Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, filteredObs.length)} of {filteredObs.length}</span>
             <div className="flex space-x-1">
               <button
-                disabled={tablePage === 1}
+                disabled={currentPage === 1}
                 onClick={() => setTablePage(p => Math.max(1, p - 1))}
                 className="px-2.5 py-1 rounded bg-slate-800 disabled:opacity-40 text-slate-300 hover:bg-slate-700"
               >
                 Prev
               </button>
-              <span className="px-2 py-1 font-mono text-slate-300">{tablePage} / {totalPages}</span>
+              <span className="px-2 py-1 font-mono text-slate-300">{currentPage} / {totalPages}</span>
               <button
-                disabled={tablePage === totalPages}
+                disabled={currentPage === totalPages}
                 onClick={() => setTablePage(p => Math.min(totalPages, p + 1))}
                 className="px-2.5 py-1 rounded bg-slate-800 disabled:opacity-40 text-slate-300 hover:bg-slate-700"
               >

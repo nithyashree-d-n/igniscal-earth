@@ -21,12 +21,12 @@ export const FireMap: React.FC<FireMapProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   
-  // Layer groups refs
+  // Layer groups refs (FeatureGroup supports getBounds() properly)
   const baseTileLayerRef = useRef<L.TileLayer | null>(null);
-  const modisLayerRef = useRef<L.LayerGroup>(L.layerGroup());
-  const viirsLayerRef = useRef<L.LayerGroup>(L.layerGroup());
-  const gridLayerRef = useRef<L.LayerGroup>(L.layerGroup());
-  const aoiLayerRef = useRef<L.LayerGroup>(L.layerGroup());
+  const modisLayerRef = useRef<L.FeatureGroup>(L.featureGroup());
+  const viirsLayerRef = useRef<L.FeatureGroup>(L.featureGroup());
+  const gridLayerRef = useRef<L.FeatureGroup>(L.featureGroup());
+  const aoiLayerRef = useRef<L.FeatureGroup>(L.featureGroup());
 
   // Basemap style: 'satellite' (Esri World Imagery) or 'osm' (OpenStreetMap)
   const [baseMapStyle, setBaseMapStyle] = useState<'satellite' | 'osm'>('satellite');
@@ -37,48 +37,61 @@ export const FireMap: React.FC<FireMapProps> = ({
   const [showGrid, setShowGrid] = useState(true);
   const [showAOI, setShowAOI] = useState(true);
 
-  // Initialize Leaflet Map
+  // Initialize Leaflet Map safely
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
+    // Prevent "Map container is already initialized" error (React 18 StrictMode / Remount)
+    if ((mapContainerRef.current as any)._leaflet_id) {
+      delete (mapContainerRef.current as any)._leaflet_id;
+    }
+
     if (!mapInstanceRef.current) {
-      const map = L.map(mapContainerRef.current, {
-        center: selectedCenter,
-        zoom: zoomLevel,
-        zoomControl: false,
-        attributionControl: false
-      });
+      try {
+        const map = L.map(mapContainerRef.current, {
+          center: selectedCenter,
+          zoom: zoomLevel,
+          zoomControl: false,
+          attributionControl: false
+        });
 
-      // Free reliable satellite tile layer (Esri World Imagery - requires NO API key)
-      const tileUrl = baseMapStyle === 'satellite'
-        ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+        // Free reliable satellite tile layer (Esri World Imagery - requires NO API key)
+        const tileUrl = baseMapStyle === 'satellite'
+          ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+          : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
-      const tileLayer = L.tileLayer(tileUrl, {
-        maxZoom: 19,
-        attribution: baseMapStyle === 'satellite'
-          ? 'Tiles &copy; Esri &mdash; NASA FIRMS'
-          : '&copy; OpenStreetMap contributors | NASA FIRMS'
-      }).addTo(map);
+        const tileLayer = L.tileLayer(tileUrl, {
+          maxZoom: 19,
+          attribution: baseMapStyle === 'satellite'
+            ? 'Tiles &copy; Esri &mdash; NASA FIRMS'
+            : '&copy; OpenStreetMap contributors | NASA FIRMS'
+        }).addTo(map);
 
-      baseTileLayerRef.current = tileLayer;
+        baseTileLayerRef.current = tileLayer;
 
-      // Attribution
-      L.control.attribution({ position: 'bottomright' }).addTo(map);
-      L.control.zoom({ position: 'bottomleft' }).addTo(map);
+        // Controls
+        L.control.attribution({ position: 'bottomright' }).addTo(map);
+        L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-      // Add layers to map
-      modisLayerRef.current.addTo(map);
-      viirsLayerRef.current.addTo(map);
-      gridLayerRef.current.addTo(map);
-      aoiLayerRef.current.addTo(map);
+        // Add layer groups to map
+        modisLayerRef.current.addTo(map);
+        viirsLayerRef.current.addTo(map);
+        gridLayerRef.current.addTo(map);
+        aoiLayerRef.current.addTo(map);
 
-      mapInstanceRef.current = map;
+        mapInstanceRef.current = map;
+      } catch (err) {
+        console.error('Failed to initialize Leaflet map instance:', err);
+      }
     }
 
     return () => {
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
+        try {
+          mapInstanceRef.current.remove();
+        } catch (e) {
+          console.warn('Error removing map instance:', e);
+        }
         mapInstanceRef.current = null;
       }
     };
@@ -90,7 +103,11 @@ export const FireMap: React.FC<FireMapProps> = ({
     if (!map) return;
 
     if (baseTileLayerRef.current) {
-      map.removeLayer(baseTileLayerRef.current);
+      try {
+        map.removeLayer(baseTileLayerRef.current);
+      } catch (e) {
+        // safe ignore
+      }
     }
 
     const tileUrl = baseMapStyle === 'satellite'
@@ -107,7 +124,7 @@ export const FireMap: React.FC<FireMapProps> = ({
     baseTileLayerRef.current = tileLayer;
   }, [baseMapStyle]);
 
-  // Sync layer toggles with Leaflet
+  // Handle Layer Visibility Toggles
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -146,21 +163,23 @@ export const FireMap: React.FC<FireMapProps> = ({
 
     if (aoiBbox && aoiBbox.length === 4) {
       const [minLon, minLat, maxLon, maxLat] = aoiBbox;
-      const bounds: L.LatLngBoundsExpression = [
-        [minLat, minLon],
-        [maxLat, maxLon]
-      ];
+      if ([minLon, minLat, maxLon, maxLat].every(n => typeof n === 'number' && isFinite(n))) {
+        const bounds: L.LatLngBoundsExpression = [
+          [minLat, minLon],
+          [maxLat, maxLon]
+        ];
 
-      const rect = L.rectangle(bounds, {
-        color: '#38bdf8',
-        weight: 2,
-        fillColor: '#0284c7',
-        fillOpacity: 0.05,
-        dashArray: '6, 6'
-      });
+        const rect = L.rectangle(bounds, {
+          color: '#38bdf8',
+          weight: 2,
+          fillColor: '#0284c7',
+          fillOpacity: 0.05,
+          dashArray: '6, 6'
+        });
 
-      rect.bindTooltip('Area of Interest (AOI)', { sticky: true, className: 'text-xs font-mono' });
-      aoiLayerRef.current.addLayer(rect);
+        rect.bindTooltip('Area of Interest (AOI)', { sticky: true, className: 'text-xs font-mono' });
+        aoiLayerRef.current.addLayer(rect);
+      }
     }
   }, [aoiBbox]);
 
@@ -172,8 +191,14 @@ export const FireMap: React.FC<FireMapProps> = ({
     gridLayerRef.current.clearLayers();
 
     gridCells.forEach((cell) => {
+      if (!cell.bounds || cell.bounds.length === 0) return;
+      
       // Cell bounds are [lon, lat], Leaflet polygon requires [lat, lon]
-      const latLngs = cell.bounds.map(([lon, lat]) => [lat, lon] as [number, number]);
+      const latLngs = cell.bounds
+        .filter(([lon, lat]) => typeof lon === 'number' && typeof lat === 'number' && isFinite(lon) && isFinite(lat))
+        .map(([lon, lat]) => [lat, lon] as [number, number]);
+
+      if (latLngs.length < 3) return;
 
       let color = '#f59e0b'; // Amber for MODIS
       if (cell.dominant_sensor === 'VIIRS') color = '#ef4444'; // Red for VIIRS
@@ -217,7 +242,7 @@ export const FireMap: React.FC<FireMapProps> = ({
     });
   }, [gridCells]);
 
-  // Render Hotspot Observation Points
+  // Render Hotspot Observation Points safely
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -226,6 +251,10 @@ export const FireMap: React.FC<FireMapProps> = ({
     viirsLayerRef.current.clearLayers();
 
     observations.forEach((obs) => {
+      if (typeof obs.lat !== 'number' || typeof obs.lon !== 'number' || !isFinite(obs.lat) || !isFinite(obs.lon)) {
+        return;
+      }
+
       const isModis = obs.sensor === 'MODIS';
       const color = isModis ? '#fbbf24' : '#f97316'; // Gold for MODIS, Bright Orange for VIIRS
 
@@ -242,18 +271,18 @@ export const FireMap: React.FC<FireMapProps> = ({
           <div class="flex items-center justify-between border-b border-slate-700 pb-1">
             <span class="font-bold text-slate-100 flex items-center space-x-1">
               <span class="w-2 h-2 rounded-full ${isModis ? 'bg-amber-400' : 'bg-orange-500'}"></span>
-              <span>${obs.sensor} (${obs.satellite})</span>
+              <span>${obs.sensor || 'Sensor'} (${obs.satellite || 'Sat'})</span>
             </span>
             <span class="px-1 py-0.5 rounded text-[10px] uppercase font-mono ${
               obs.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-300' :
               obs.confidence === 'low' ? 'bg-slate-700 text-slate-400' : 'bg-blue-500/20 text-blue-300'
             }">
-              ${obs.confidence}
+              ${obs.confidence || 'nominal'}
             </span>
           </div>
           <div class="grid grid-cols-2 gap-x-2">
             <span class="text-slate-400">Acquisition:</span>
-            <span class="text-slate-200 text-right">${obs.date} ${obs.time}Z</span>
+            <span class="text-slate-200 text-right">${obs.date || ''} ${obs.time || ''}Z</span>
             <span class="text-slate-400">Coordinates:</span>
             <span class="text-slate-200 text-right font-mono">${obs.lat.toFixed(4)}, ${obs.lon.toFixed(4)}</span>
             <span class="text-slate-400">Radiative Power (FRP):</span>
@@ -280,13 +309,30 @@ export const FireMap: React.FC<FireMapProps> = ({
       }
     });
 
-    // Auto-fit bounds if we have points or AOI
-    if (observations.length > 0) {
-      const group = L.featureGroup([modisLayerRef.current, viirsLayerRef.current]);
-      map.fitBounds(group.getBounds().pad(0.1));
-    } else if (aoiBbox && aoiBbox.length === 4) {
-      const [minLon, minLat, maxLon, maxLat] = aoiBbox;
-      map.fitBounds([[minLat, minLon], [maxLat, maxLon]], { padding: [20, 20] });
+    // Auto-fit bounds safely with full validity guards
+    try {
+      if (observations.length > 0) {
+        const validCoords = observations
+          .filter(o => typeof o.lat === 'number' && !isNaN(o.lat) && typeof o.lon === 'number' && !isNaN(o.lon))
+          .map(o => [o.lat, o.lon] as [number, number]);
+
+        if (validCoords.length > 0) {
+          const bounds = L.latLngBounds(validCoords);
+          if (bounds.isValid()) {
+            map.fitBounds(bounds.pad(0.1), { maxZoom: 12, animate: false });
+          }
+        }
+      } else if (aoiBbox && aoiBbox.length === 4) {
+        const [minLon, minLat, maxLon, maxLat] = aoiBbox;
+        if ([minLon, minLat, maxLon, maxLat].every(n => typeof n === 'number' && isFinite(n))) {
+          const bounds = L.latLngBounds([[minLat, minLon], [maxLat, maxLon]]);
+          if (bounds.isValid()) {
+            map.fitBounds(bounds, { padding: [20, 20], maxZoom: 12, animate: false });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Map fitBounds handled safely:', err);
     }
   }, [observations]);
 
@@ -356,8 +402,8 @@ export const FireMap: React.FC<FireMapProps> = ({
 
           <label className="flex items-center justify-between space-x-3 cursor-pointer text-slate-300 hover:text-white">
             <span className="flex items-center space-x-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm bg-purple-500/70 border border-purple-400"></span>
-              <span>1 km Common Grid</span>
+              <span className="w-2.5 h-2.5 rounded border border-amber-400 bg-amber-500/40"></span>
+              <span>Harmonized Grid (~1 km)</span>
             </span>
             <input
               type="checkbox"
@@ -369,8 +415,8 @@ export const FireMap: React.FC<FireMapProps> = ({
 
           <label className="flex items-center justify-between space-x-3 cursor-pointer text-slate-300 hover:text-white">
             <span className="flex items-center space-x-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm border border-sky-400 border-dashed"></span>
-              <span>Selected AOI</span>
+              <span className="w-2.5 h-2.5 rounded border border-sky-400 border-dashed"></span>
+              <span>AOI Boundary</span>
             </span>
             <input
               type="checkbox"
@@ -380,24 +426,16 @@ export const FireMap: React.FC<FireMapProps> = ({
             />
           </label>
         </div>
-      </div>
 
-      {/* Map Legend Overlay in Bottom-Right */}
-      <div className="absolute bottom-3 right-3 z-10 bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg px-3 py-2 shadow-lg text-[11px] text-slate-300 space-y-1">
-        <div className="font-semibold text-slate-200">Sensor Legend</div>
-        <div className="flex items-center space-x-3">
-          <span className="flex items-center space-x-1">
-            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-            <span>MODIS</span>
-          </span>
-          <span className="flex items-center space-x-1">
-            <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-            <span>VIIRS</span>
-          </span>
-          <span className="flex items-center space-x-1">
-            <span className="w-2 h-2 rounded-full bg-sky-400"></span>
-            <span>Co-located</span>
-          </span>
+        {/* Legend Quick Info */}
+        <div className="pt-2 border-t border-slate-800 text-[10px] text-slate-400 space-y-1">
+          <div className="flex items-center space-x-1 text-sky-300 font-medium">
+            <span className="w-2 h-2 rounded-full border border-sky-400"></span>
+            <span>Cyan Ring = Co-located</span>
+          </div>
+          <div className="text-[9px] text-slate-500 leading-tight">
+            Concurrent MODIS & VIIRS detection within 1000m / 60min window
+          </div>
         </div>
       </div>
     </div>
